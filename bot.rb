@@ -49,6 +49,21 @@ def send_statistics(bot, chat_id, poll)
   bot.api.send_message(chat_id: chat_id, text: statistics, parse_mode: :markdown)
 end
 
+def show_poll(bot, chat_id, poll)
+  kb = poll[:options].map do |option|
+    Telegram::Bot::Types::InlineKeyboardButton.new(text: option[:text], callback_data: "option_#{option[:id]}")
+  end
+
+  markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+  bot.api.send_message(chat_id: chat_id, text: poll[:title], reply_markup: markup)
+end
+
+def finish_poll(bot, chat_id, poll)
+  poll[:state] = :voting
+
+  bot.api.send_message(chat_id: chat_id, text: 'Alright.')
+end
+
 Telegram::Bot::Client.run(token) do |bot|
   bot.listen do |message|
     chat_id = get_chat_id(message)
@@ -65,6 +80,9 @@ Telegram::Bot::Client.run(token) do |bot|
         poll[:options] = add_votee(message, poll)
 
         send_statistics(bot, chat_id, poll)
+      elsif message.data == 'finish'
+        finish_poll(bot, chat_id, poll)
+        show_poll(bot, chat_id, poll)
       end
     when Telegram::Bot::Types::Message
       if poll.nil?
@@ -81,14 +99,9 @@ Telegram::Bot::Client.run(token) do |bot|
       else
         case message.text
         when '/finish'
-          bot.api.send_message(chat_id: message.chat.id, text: 'Alright.')
+          finish_poll(bot, chat_id, poll)
 
-          kb = poll[:options].map do |option|
-            Telegram::Bot::Types::InlineKeyboardButton.new(text: option[:text], callback_data: "option_#{option[:id]}")
-          end
-
-          markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-          bot.api.send_message(chat_id: message.chat.id, text: poll[:title], reply_markup: markup)
+          show_poll(bot, chat_id, poll)
         else
           case poll[:state]
           when :poll_title
@@ -101,7 +114,10 @@ Telegram::Bot::Client.run(token) do |bot|
             poll[:options] = [] if poll[:options].nil?
             poll[:options] << { id: SecureRandom.hex, text: message.text, votees: [] }
 
-            bot.api.send_message(chat_id: message.chat.id, text: "Added option. What's your next option? Use `/finish` to end setting up the poll.")
+            keyboard = [Telegram::Bot::Types::InlineKeyboardButton.new(text: 'Finish poll', callback_data: 'finish')]
+            markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: keyboard)
+
+            bot.api.send_message(chat_id: message.chat.id, text: "Added option. What's your next option? Use `/finish` to end setting up the poll.", reply_markup: markup)
           end
         end
       end
