@@ -7,38 +7,53 @@ token = ENV['TELEGRAM_BOT_TOKEN']
 
 polls = {}
 
+def get_chat_id(message)
+  case message
+  when Telegram::Bot::Types::CallbackQuery
+    message.message.chat.id
+  when Telegram::Bot::Types::Message
+    message.chat.id
+  end
+end
+
+def add_votee(message, poll)
+  option_id = message.data.split('_')[1]
+
+  poll[:options].map do |option|
+    if option[:id] == option_id
+      # TODO: users should not be able to vote twice for the same option
+      option[:votees] << message.from
+      option
+    else
+      option
+    end
+  end
+end
+
+def send_statistics(bot, chat_id, poll)
+  statistics = poll[:options].map do |option|
+    "#{option[:text]} (#{option[:votees].map(&:first_name).join(', ')})"
+  end.join(' / ')
+
+  bot.api.send_message(chat_id: chat_id, text: "#{poll[:title]}: #{statistics}")
+end
+
 Telegram::Bot::Client.run(token) do |bot|
   bot.listen do |message|
-    poll = if message.respond_to?(:chat)
-             polls[message.chat.id]
-           else
-             polls[message.message.chat.id]
-           end
+    chat_id = get_chat_id(message)
+    poll = polls[chat_id]
 
     case message
     when Telegram::Bot::Types::CallbackQuery
       if poll.nil?
-        puts "Don't know the poll for chat id #{message.message.chat.id}"
+        puts "Don't know the poll for chat id #{chat_id}"
         next
       end
 
       if message.data.start_with?('option')
-        option_id = message.data.split('_')[1]
+        poll[:options] = add_votee(message, poll)
 
-        poll[:options] = poll[:options].map do |option|
-          if option[:id] == option_id
-            # TODO: users should not be able to vote twice for the same option
-            option[:votees] << message.from
-            option
-          else
-            option
-          end
-        end
-
-        statistics = poll[:options].map do |option|
-          "#{option[:text]} (#{option[:votees].map(&:first_name).join(', ')})"
-        end.join(' / ')
-        bot.api.send_message(chat_id: message.from.id, text: "#{poll[:title]}: #{statistics}")
+        send_statistics(bot, chat_id, poll)
       end
     when Telegram::Bot::Types::Message
       if poll.nil?
