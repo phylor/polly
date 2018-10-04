@@ -1,8 +1,6 @@
 require 'telegram/bot'
 require 'securerandom'
 
-require 'byebug'
-
 token = ENV['TELEGRAM_BOT_TOKEN']
 
 polls = {}
