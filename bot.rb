@@ -31,11 +31,22 @@ def add_votee(message, poll)
 end
 
 def send_statistics(bot, chat_id, poll)
-  statistics = poll[:options].map do |option|
-    "#{option[:text]} (#{option[:votees].map(&:first_name).join(', ')})"
-  end.join(' / ')
+  options = poll[:options].map do |option|
+    <<~OPTION
+      #{option[:text]}
+      #{option[:votees].map do |user|
+        "☝ #{user.first_name} #{user.last_name}"
+      end.join("\n")}
+    OPTION
+  end.join("\n\n")
 
-  bot.api.send_message(chat_id: chat_id, text: "#{poll[:title]}: #{statistics}")
+  statistics = <<~STATISTICS
+               *#{poll[:title]}*
+
+               #{options}
+               STATISTICS
+
+  bot.api.send_message(chat_id: chat_id, text: statistics, parse_mode: :markdown)
 end
 
 Telegram::Bot::Client.run(token) do |bot|
