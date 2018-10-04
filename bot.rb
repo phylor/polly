@@ -21,11 +21,14 @@ def add_votee(message, poll)
 
   poll[:options].map do |option|
     if option[:id] == option_id
-      # TODO: users should not be able to vote twice for the same option
-      if !option[:votees].map { |o| o[:user_id] }.include?(message.from.id)
+      if option[:votees].map { |o| o[:user_id] }.include?(message.from.id)
+        option[:votees].delete_if { |vote| vote[:user_id] == message.from.id }
+        yield option, :removed
+      else
         option[:votees] << { user_id: message.from.id, user: message.from }
-        yield option
+        yield option, :added
       end
+
       option
     else
       option
@@ -81,8 +84,13 @@ Telegram::Bot::Client.run(token) do |bot|
       end
 
       if message.data.start_with?('option')
-        poll[:options] = add_votee(message, poll) do |option|
-          bot.api.send_message(chat_id: chat_id, text: "#{message.from.first_name} voted for *#{option[:text]}*.", parse_mode: :markdown)
+        poll[:options] = add_votee(message, poll) do |option, type|
+          case type
+          when :added
+            bot.api.send_message(chat_id: chat_id, text: "#{message.from.first_name} voted for *#{option[:text]}*.", parse_mode: :markdown)
+          when :removed
+            bot.api.send_message(chat_id: chat_id, text: "#{message.from.first_name} withdrew the vote for *#{option[:text]}*.", parse_mode: :markdown)
+          end
         end
       elsif message.data == 'finish'
         finish_poll(bot, chat_id, poll)
