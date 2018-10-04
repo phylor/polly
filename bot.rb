@@ -22,8 +22,10 @@ def add_votee(message, poll)
   poll[:options].map do |option|
     if option[:id] == option_id
       # TODO: users should not be able to vote twice for the same option
-      option[:votees] << message.from
-      yield option
+      if !option[:votees].map { |o| o[:user_id] }.include?(message.from.id)
+        option[:votees] << { user_id: message.from.id, user: message.from }
+        yield option
+      end
       option
     else
       option
@@ -36,7 +38,7 @@ def send_statistics(bot, chat_id, poll)
     <<~OPTION
       #{option[:text]}
       #{option[:votees].map do |user|
-        "☝ #{user.first_name} #{user.last_name}"
+        "☝ #{user[:user].first_name} #{user[:user].last_name}"
       end.join("\n")}
     OPTION
   end.join("\n\n")
