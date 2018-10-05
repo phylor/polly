@@ -103,14 +103,7 @@ Telegram::Bot::Client.run(token) do |bot|
           bot.api.send_message(chat_id: message.chat.id, text: "I created a poll with the title *#{title}*. What's your first option? You need at least two.", parse_mode: :markdown)
       end
 
-      if poll.nil?
-        case message.text
-        when '/start'
-          bot.api.send_message(chat_id: message.chat.id, text: "Hello, #{message.from.first_name}")
-        when '/stop'
-          bot.api.send_message(chat_id: message.chat.id, text: "Bye, #{message.from.first_name}")
-        end
-      else
+      if !poll.nil?
         case message.text
         when '/finish'
           finish_poll(bot, chat_id, poll)
